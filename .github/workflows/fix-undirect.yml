@@ -1,4 +1,4 @@
-name: Reparer Dependance (Methode ZIP Corrigee)
+name: Reparer Dependance (Methode API V3)
 on: workflow_dispatch
 
 jobs:
@@ -14,7 +14,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Telecharger Lib (ZIP) et Modifier Makefile
+      - name: Telecharger Lib et Modifier Makefile
         run: |
           # 1. Configuration Git
           git config --global user.email "actions@github.com"
@@ -23,36 +23,36 @@ jobs:
           # 2. Nettoyage préventif
           rm -rf Tweaks/libundirect
           
-          # 3. Téléchargement manuel de l'archive ZIP (Méthode robuste)
-          echo "Téléchargement de libundirect.zip..."
-          # On essaie d'abord 'master', si ça échoue on essaie 'main'
-          if curl -s -f -L -o libundirect.zip https://github.com/PoomSmart/libundirect/archive/refs/heads/master.zip; then
-            echo "Téléchargé depuis master"
-          else
-            echo "Echec master, tentative sur main..."
-            curl -L -o libundirect.zip https://github.com/PoomSmart/libundirect/archive/refs/heads/main.zip
+          # 3. Téléchargement via API GitHub (Plus sûr)
+          echo "Téléchargement de l'archive..."
+          
+          # On télécharge l'archive TAR.GZ au lieu de ZIP (souvent plus fiable sur Linux)
+          # On suit les redirections (-L)
+          curl -L https://api.github.com/repos/PoomSmart/libundirect/tarball/master -o libundirect.tar.gz
+          
+          # Vérification de la taille du fichier (si < 100 octets, c'est une erreur)
+          FILESIZE=$(wc -c < "libundirect.tar.gz")
+          if [ $FILESIZE -lt 100 ]; then
+              echo "Echec téléchargement master, tentative sur main..."
+              curl -L https://api.github.com/repos/PoomSmart/libundirect/tarball/main -o libundirect.tar.gz
           fi
           
           # 4. Extraction
-          unzip -q libundirect.zip
-          
-          # Renommage intelligent : on trouve le dossier extrait quel que soit son nom
-          EXTRACTED_DIR=$(ls -d libundirect-*)
-          mv "$EXTRACTED_DIR" Tweaks/libundirect
-          rm libundirect.zip
+          mkdir -p Tweaks/libundirect
+          # On extrait en ignorant le premier niveau de dossier (--strip-components=1)
+          tar -xzf libundirect.tar.gz -C Tweaks/libundirect --strip-components=1
+          rm libundirect.tar.gz
           
           # 5. Modification du Makefile
           if [ -f "Tweaks/Makefile" ]; then
             echo "Mise à jour du Makefile..."
-            # On supprime les anciennes références
             sed -i '/libundirect/d' Tweaks/Makefile
-            # On insère la ligne avant YTUHD
             sed -i '/YTUHD/i SUBPROJECTS += libundirect' Tweaks/Makefile
           fi
 
           # 6. Validation et Envoi
           git add .
-          git commit -m "Fix: Ajout libundirect (via ZIP V2)" || echo "Rien à commiter"
+          git commit -m "Fix: Ajout libundirect (via API Tarball)" || echo "Rien à commiter"
           
           # Poussée forcée avec le token
           git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main
