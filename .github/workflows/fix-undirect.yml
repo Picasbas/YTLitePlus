@@ -1,0 +1,52 @@
+name: Reparer Dependance Manquante
+on: workflow_dispatch
+
+jobs:
+  fix-repo:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Ajouter libundirect et modifier Makefile
+        run: |
+          # Configuration de l'utilisateur Git (obligatoire pour commiter)
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+          # 1. Ajout du sous-module manquant
+          # Nous vérifions d'abord s'il n'existe pas déjà pour éviter une erreur
+          if [ ! -d "Tweaks/libundirect" ]; then
+            git submodule add https://github.com/PoomSmart/libundirect Tweaks/libundirect
+          else
+            echo "Le dossier existe déjà, on tente une mise à jour..."
+            git submodule update --init --recursive
+          fi
+
+          # 2. Modification du Makefile pour inclure la librairie AVANT YTUHD
+          # On cherche le fichier Makefile dans le dossier Tweaks
+          if [ -f "Tweaks/Makefile" ]; then
+            echo "Modification de Tweaks/Makefile..."
+            # Cette commande insère "SUBPROJECTS += libundirect" juste avant la ligne contenant "YTUHD"
+            # Cela garantit que la librairie est compilée avant le tweak qui en a besoin.
+            sed -i '/YTUHD/i SUBPROJECTS += libundirect' Tweaks/Makefile
+            
+            # Si YTUHD n'est pas trouvé, on l'ajoute à la fin par sécurité
+            if ! grep -q "libundirect" Tweaks/Makefile; then
+              echo "SUBPROJECTS += libundirect" >> Tweaks/Makefile
+            fi
+          else
+            echo "ERREUR: Tweaks/Makefile introuvable !"
+            exit 1
+          fi
+
+          # 3. Validation et envoi des modifications
+          git add .
+          git commit -m "Fix: Ajout automatique de la dépendance libundirect"
+          git push
