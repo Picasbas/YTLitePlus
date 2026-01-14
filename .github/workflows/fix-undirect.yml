@@ -1,4 +1,4 @@
-name: Reparer Dependance (Methode ZIP)
+name: Reparer Dependance (Methode ZIP Corrigee)
 on: workflow_dispatch
 
 jobs:
@@ -23,14 +23,22 @@ jobs:
           # 2. Nettoyage préventif
           rm -rf Tweaks/libundirect
           
-          # 3. Téléchargement manuel de l'archive ZIP (Méthode infaillible)
+          # 3. Téléchargement manuel de l'archive ZIP (Méthode robuste)
           echo "Téléchargement de libundirect.zip..."
-          curl -L -o libundirect.zip https://github.com/PoomSmart/libundirect/archive/refs/heads/master.zip
+          # On essaie d'abord 'master', si ça échoue on essaie 'main'
+          if curl -s -f -L -o libundirect.zip https://github.com/PoomSmart/libundirect/archive/refs/heads/master.zip; then
+            echo "Téléchargé depuis master"
+          else
+            echo "Echec master, tentative sur main..."
+            curl -L -o libundirect.zip https://github.com/PoomSmart/libundirect/archive/refs/heads/main.zip
+          fi
           
           # 4. Extraction
           unzip -q libundirect.zip
-          # Renommage du dossier extrait (qui s'appelle souvent libundirect-master) vers Tweaks/libundirect
-          mv libundirect-master Tweaks/libundirect
+          
+          # Renommage intelligent : on trouve le dossier extrait quel que soit son nom
+          EXTRACTED_DIR=$(ls -d libundirect-*)
+          mv "$EXTRACTED_DIR" Tweaks/libundirect
           rm libundirect.zip
           
           # 5. Modification du Makefile
@@ -44,7 +52,7 @@ jobs:
 
           # 6. Validation et Envoi
           git add .
-          git commit -m "Fix: Ajout libundirect (via ZIP)" || echo "Rien à commiter"
+          git commit -m "Fix: Ajout libundirect (via ZIP V2)" || echo "Rien à commiter"
           
           # Poussée forcée avec le token
           git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main
