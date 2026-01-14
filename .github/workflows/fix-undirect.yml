@@ -1,4 +1,4 @@
-name: Reparer Dependance Manquante (Force)
+name: Reparer Dependance (Methode Dossier)
 on: workflow_dispatch
 
 jobs:
@@ -14,36 +14,36 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Ajouter libundirect et modifier Makefile
+      - name: Telecharger Lib et Modifier Makefile
         run: |
-          # 1. Configuration de l'utilisateur
+          # 1. Configuration Git
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
 
-          # 2. NETTOYAGE DES IDENTIFIANTS (C'est la partie qui corrige votre erreur 128)
-          # On supprime l'en-tête d'autorisation qui bloque le téléchargement des dépôts publics externes
-          git config --local --unset-all http.https://github.com/.extraheader
-
-          # 3. Ajout du sous-module (avec .git à la fin pour être sûr)
-          if [ ! -d "Tweaks/libundirect" ]; then
-            echo "Ajout du sous-module..."
-            git submodule add https://github.com/PoomSmart/libundirect.git Tweaks/libundirect
-          else
-            echo "Le dossier existe déjà."
-          fi
-
-          # 4. Modification du Makefile
+          # 2. Nettoyage préventif
+          rm -rf Tweaks/libundirect
+          
+          # 3. Téléchargement manuel du code (Clone)
+          echo "Clonage de libundirect..."
+          git clone https://github.com/PoomSmart/libundirect.git Tweaks/libundirect
+          
+          # 4. TRANSFORMATION EN DOSSIER SIMPLE (L'astuce est ici)
+          # On supprime le dossier .git interne pour que ce ne soit plus un sous-module
+          # Cela évite toutes les erreurs d'authentification futures
+          rm -rf Tweaks/libundirect/.git
+          
+          # 5. Modification du Makefile
           if [ -f "Tweaks/Makefile" ]; then
-            echo "Modification de Tweaks/Makefile..."
-            # On nettoie d'abord au cas où le script a déjà tourné partiellement
+            echo "Mise à jour du Makefile..."
+            # On supprime les anciennes références pour éviter les doublons
             sed -i '/libundirect/d' Tweaks/Makefile
-            # On insère la ligne correctement
+            # On insère la ligne avant YTUHD
             sed -i '/YTUHD/i SUBPROJECTS += libundirect' Tweaks/Makefile
           fi
 
-          # 5. Validation et Envoi (Méthode forcée avec Token)
+          # 6. Validation et Envoi
           git add .
-          git commit -m "Fix: Ajout dependance libundirect" || echo "Rien à commiter"
+          git commit -m "Fix: Ajout libundirect comme dossier source" || echo "Rien à commiter"
           
-          # On pousse en utilisant le token explicitement dans l'URL pour contourner le nettoyage fait à l'étape 2
+          # Poussée forcée avec le token
           git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" HEAD:main
