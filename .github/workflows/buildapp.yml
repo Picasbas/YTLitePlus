@@ -62,6 +62,7 @@ jobs:
       - name: Checkout Main
         uses: actions/checkout@v4
         with:
+          lfs: true
           path: main
           ref: ${{ github.event.inputs.commit_id || github.ref }}
           submodules: recursive
